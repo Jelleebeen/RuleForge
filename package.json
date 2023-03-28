@@ -1,0 +1,14 @@
+{
+  "name": "ruleforge",
+  "version": "0.0.1",
+  "repository": "https://github.com/Jelleebeen/RuleForge",
+  "description": "A library for adding rules to your web app.",
+  "scripts": {
+    "compile": "rd /s /q dist && tsc && tsc --build tsconfig.es5.json"
+  },
+  "author": "Dave Hurst",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.2"
+  }
+}
