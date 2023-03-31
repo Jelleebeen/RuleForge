@@ -139,7 +139,7 @@ export class Ruleset {
                 if (result === RULE.ERROR) throw new Error(`An error occurred when running rule '${currRuleName}'`)
 
                 if (seenRules.includes(result)) {
-                    if (failOnInfinite) return false
+                    if (failOnInfinite) return false // Set to fail when an infinite loop is found, so return false.
                     throw new Error(`An infinite loop happened when running rule '${currRuleName}', it loops back to a rule that has run before ('${result}')`)
                 }
                 currRuleName = result
@@ -169,49 +169,52 @@ export class Ruleset {
 
 export class RuleForge {
     // RuleForge is a helper class, filled with functions to help with the building blocks of a ruleset.
-    private rulesets: Ruleset[] = [] // TODO - Replace with Hash Map
+    private _rulesetMap: Map<string, Ruleset> = new Map<string, Ruleset>
     private baseAction: IAction = new Action(() => {})
-    private facts: Fact[] = [] // TODO - Replace with Hash Map???
-    private lastRulesetIndex: number = -1
+    private _factMap: Map<string, Fact> = new Map<string, Fact>
+    private lastRuleset: string = ''
     private lastRule: string = ''
     private lastResult: string = ''
           
-    public NewRuleset(name: string): this {
-        this.rulesets.push(new Ruleset(name))
-        this.lastRulesetIndex = this.rulesets.length - 1
+    public NewRuleset(name: string): this {    
+        const newRuleset: Ruleset = new Ruleset(name)
+
+        this._rulesetMap.set(name, newRuleset)
+        this.lastRuleset = name
         return this
     }
 
     public RemoveRuleset(name: string): this {
-        const index = this.rulesets.findIndex((rs) => rs.name === name)
-        if (index > -1) this.rulesets.splice(index, 1)
-        
-        // If the removed ruleset 
-        if (index == this.lastRulesetIndex) {
-            this.lastRulesetIndex = -1 
-        } else if (index < this.lastRulesetIndex) {
-            this.lastRulesetIndex--
-        }
+        this._rulesetMap.delete(name)
+        if (this.lastRuleset === name) this.lastRuleset = ''
 
         return this
     }
 
-    private rulesetCheck(): void {
-        if(this.lastRulesetIndex <= -1 || this.lastRulesetIndex > this.rulesets.length) throw new Error(`Ruleset could not be found for this RuleForge (was it removed?)`)
+    private rulesetError(): string {
+        return `Ruleset could not be found for this RuleForge (was it removed?)`
+    }
+
+    private rulesetNameError(rulesetName: string): string {
+        return `Ruleset '${rulesetName}' could not be found for this RuleForge (was it removed?)`
+    }
+
+    private ruleError(rulesetName: string): string {
+        return `Rule could not be found in ruleset '${rulesetName}' for this RuleForge`
     }
 
     private ruleCheck(): void {
-        this.rulesetCheck()
-
-        const rulesetName = this.rulesets[this.lastRulesetIndex].name
-
-        if(this.lastRule === '') throw new Error(`Rule could not be found in ruleset '${rulesetName}' for this RuleForge`)
+        if (this.lastRuleset == '') throw new Error(this.rulesetError())
+        if (this.lastRule === '') throw new Error(this.ruleError(this.lastRuleset))
     }
 
     public AddRule(ruleName: string, action: IAction = this.baseAction): this {
-        this.rulesetCheck()
+        if (this.lastRuleset == '') throw new Error(this.rulesetError())
 
-        this.rulesets[this.lastRulesetIndex].addRule(new Rule(ruleName, action))
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+        
+        ruleset.addRule(new Rule(ruleName, action))
 
         this.lastRule = ruleName
 
@@ -219,19 +222,17 @@ export class RuleForge {
     }
 
     public AddRuleToRuleset(rulesetName: string, ruleName: string, action: IAction = this.baseAction): this {
-        const ruleset = this.rulesets.find((rs) => rs.name === rulesetName)
-
-        if (ruleset === undefined) throw new Error(`The ruleset provided ('${rulesetName}') does not exist`) // TODO - Make a private function for these two lines.
-
+        const ruleset = this._rulesetMap.get(rulesetName) 
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))     
+        
         ruleset.addRule(new Rule(ruleName, action))
 
         return this
     }
 
     public RemoveRuleFromRuleset(rulesetName: string, ruleName: string): this {
-        const ruleset = this.rulesets.find((rs) => rs.name === rulesetName)
-
-        if (ruleset === undefined) return this
+        const ruleset = this._rulesetMap.get(rulesetName) 
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
         ruleset.removeRule(ruleName)
 
@@ -241,17 +242,18 @@ export class RuleForge {
     public AddAction(actionFunction: () => void): this {
         this.ruleCheck()
 
-        const rule = this.rulesets[this.lastRulesetIndex].getRule(this.lastRule)
-        
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+
+        const rule = ruleset.getRule(this.lastRule)
         rule.action = new Action(actionFunction)
 
         return this
     }
 
     public AddActionToRule(rulesetName: string, ruleName: string, actionFunction: () => void): this {
-        const ruleset = this.rulesets.find((rs) => rs.name === rulesetName)
-
-        if (ruleset === undefined) throw new Error(`The ruleset provided ('${rulesetName}') does not exist`)
+        const ruleset = this._rulesetMap.get(rulesetName)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
         ruleset.getRule(ruleName).action = new Action(actionFunction)
 
@@ -259,9 +261,8 @@ export class RuleForge {
     }
 
     public ClearActionFromRule(rulesetName: string, ruleName: string): this {
-        const ruleset = this.rulesets.find((rs) => rs.name === rulesetName)
-
-        if (ruleset === undefined) throw new Error(`The ruleset provided ('${rulesetName}') does not exist`)
+        const ruleset = this._rulesetMap.get(rulesetName)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
         ruleset.getRule(ruleName). action = this.baseAction
 
@@ -271,7 +272,10 @@ export class RuleForge {
     public AddCondition(conditionName: string, testFunction: (fact: Fact) => string): this {
         this.ruleCheck()
 
-        const rule = this.rulesets[this.lastRulesetIndex].getRule(this.lastRule)
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+
+        const rule = ruleset.getRule(this.lastRule)
 
         rule.addCondition(new Condition(conditionName, testFunction))
 
@@ -279,9 +283,8 @@ export class RuleForge {
     }
 
     public AddConditionToRule(rulesetName: string, ruleName: string, conditionName: string, testFunction: (fact: Fact) => string): this {
-        const ruleset = this.rulesets.find((rs) => rs.name === rulesetName)
-
-        if (ruleset === undefined) throw new Error(`The ruleset provided ('${rulesetName}') does not exist`)
+        const ruleset = this._rulesetMap.get(rulesetName)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
         ruleset.getRule(ruleName).addCondition(new Condition(conditionName, testFunction))
 
@@ -289,9 +292,8 @@ export class RuleForge {
     }
 
     public RemoveConditionFromRule(rulesetName: string, ruleName: string, conditionName: string): this {
-        const ruleset = this.rulesets.find((rs) => rs.name === rulesetName)
-
-        if (ruleset === undefined) throw new Error(`The ruleset provided ('${rulesetName}') does not exist`)
+        const ruleset = this._rulesetMap.get(rulesetName)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
         ruleset.getRule(ruleName).removeCondition(conditionName)
 
@@ -301,7 +303,10 @@ export class RuleForge {
     public RunRules(fact: Fact, fireOnPass: boolean = true, failOnInfinite: boolean = false): this {
         this.ruleCheck()
 
-        const result = this.rulesets[this.lastRulesetIndex].runRules(fact, fireOnPass, failOnInfinite)
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+
+        const result: boolean = ruleset.runRules(fact, fireOnPass, failOnInfinite)
 
         this.lastResult = result ? RULE.PASS : RULE.FAIL
 
@@ -314,17 +319,66 @@ export class RuleForge {
         if (this.lastResult === '') throw new Error(`The rules have not been run for this RuleForge (did you call RunRules yet?)`)
 
         if (this.lastResult === RULE.PASS) return true
-
         if (this.lastResult === RULE.FAIL) return false
 
+        // Result not expected (not blank, pass or fail). Throw error.
         throw new Error(`An unknown error occurred. Could not read the results for this RuleForge`)
     }
 
     public FireAllPasses(): this {
         this.ruleCheck()
 
-        this.rulesets[this.lastRulesetIndex].fireAllPasses()
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+
+        ruleset.fireAllPasses()
         
+        return this
+    }
+
+    public AddFact(factName: string, fact: Fact): this {
+        this._factMap.set(factName, fact)
+
+        return this
+    }
+
+    public GetFact(factName: string) : Fact | undefined {
+        return this._factMap.get(factName)
+    }
+
+    public DeleteFact(factName: string): this {
+        this._factMap.delete(factName)
+
+        return this
+    }
+
+    public BulkRunRules(fireOnPass: boolean = true, failOnInfinite: boolean = false): this {
+        this.ruleCheck()
+
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+
+        // TODO - Create a results object for storing the results of each fact on each rule in each ruleset.
+        // TODO - Create a function for returning the results of this bulk run.
+        this._factMap.forEach((fact) => {
+            const result: boolean = ruleset.runRules(fact, fireOnPass, failOnInfinite)
+
+            this.lastResult = result ? RULE.PASS : RULE.FAIL
+        })
+
+        return this
+    }
+
+    public BulkRunRulesOnRuleset(rulesetName: string, fireOnPass: boolean = true, failOnInfinite: boolean = false): this {
+        const ruleset = this._rulesetMap.get(rulesetName)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
+
+        this._factMap.forEach((fact) => {
+            const result: boolean = ruleset.runRules(fact, fireOnPass, failOnInfinite)
+
+            this.lastResult = result ? RULE.PASS : RULE.FAIL
+        })
+
         return this
     }
 
