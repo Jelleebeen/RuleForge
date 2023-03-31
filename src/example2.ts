@@ -5,7 +5,7 @@ export module runExample {
     // Fact to run through the ruleset
     const fact1: Fact = {
         val1: true,
-        val2: 'rule2',
+        val2: 'rule3',
         val3: 'passme'
     }
 
@@ -39,4 +39,5 @@ export module runExample {
             .RunRules(fact1)
             .GetResult()
     }
+    testFunction()
 }

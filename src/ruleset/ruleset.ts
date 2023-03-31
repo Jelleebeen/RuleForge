@@ -53,12 +53,13 @@ export class Condition implements ICondition {
 
 export class Rule implements IRule {   
     private readonly _name: string
-    private readonly _action: IAction
+    private _action: IAction
     private _conditions: ICondition[] = [] // TODO - Replace with Hash map?
     
 
     public get name() { return this._name }
     public get action() { return this._action}
+    public set action(val: IAction) { this._action = val }
     public get conditions() { return this._conditions}
 
     constructor(name: string, action: IAction, conditions?: ICondition[]) {
@@ -196,7 +197,7 @@ export class RuleForge {
     }
 
     private rulesetCheck(): void {
-        if(this.lastRulesetIndex > -1 || this.lastRulesetIndex > this.rulesets.length) throw new Error(`Ruleset could not be found for this RuleForge (was it removed?)`)
+        if(this.lastRulesetIndex <= -1 || this.lastRulesetIndex > this.rulesets.length) throw new Error(`Ruleset could not be found for this RuleForge (was it removed?)`)
     }
 
     private ruleCheck(): void {
