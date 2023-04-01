@@ -1,6 +1,6 @@
 {
   "name": "ruleforge",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "repository": "https://github.com/Jelleebeen/RuleForge",
   "description": "A library for adding rules to your web app.",
   "scripts": {
