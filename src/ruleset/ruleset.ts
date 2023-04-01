@@ -4,23 +4,33 @@ export enum OUTCOME {
     FAIL = 'FAIL'
 }
 
-interface IRule {
+export interface IRuleset {
+    name: string
+    results: Result[]
+    addRule(rule: IRule): void
+    getRule(ruleName: string): IRule
+    removeRule(ruleName: string): void
+    runRules(fact: Fact, fireOnPass: boolean, failOnInfinite: boolean): Result
+    fireAllPasses(obj?: any): void
+}
+
+export interface IRule {
     name: string
     conditions: ICondition[]
     action: IAction
     addCondition: (condition: ICondition) => void
     removeCondition: (conditionName: string) => void
     testConditions: (fact: Fact) => string | OUTCOME
-    fireAction: () => void
+    fireAction: (obj?: any) => void
 }
 
-interface ICondition {
+export interface ICondition {
     name: string
     test: (fact: Fact) => string | OUTCOME
 }
 
-interface IAction {
-    act: () => void
+export interface IAction {
+    act: (obj?: any) => void
 }
 
 export type Result = {
@@ -36,9 +46,9 @@ export type Fact = {
 }
 
 export class Action implements IAction {
-    public act = () => {}
+    public act = (obj?: any) => {}
 
-    constructor(actFunction: () => void) {
+    constructor(actFunction: (obj?: any) => void) {
         this.act = actFunction
     }
 }
@@ -97,13 +107,13 @@ export class Rule implements IRule {
         return OUTCOME.PASS
     }
 
-    public fireAction(): void {
-        this._action.act()
+    public fireAction(obj?: any): void {
+        this._action.act(obj)
     }
 
 }
 
-export class Ruleset {
+export class Ruleset implements IRuleset {
     private readonly _name: string
     private readonly _ruleMap: Map<string, IRule>
     private _passedRules: string[] = []
@@ -147,7 +157,6 @@ export class Ruleset {
         rulemaploop:
         for(let [key, value] of this._ruleMap) {
             
-            result
             result.outcome = value.testConditions(fact) // Result of running the conditions on this rule.
             result.ruleName = key // The name of this rule.
             this._results.push(result)
@@ -186,10 +195,10 @@ export class Ruleset {
         return result
     }
 
-    public fireAllPasses(): void {
+    public fireAllPasses(obj?: any): void {
         for(let i = 0; i < this._passedRules.length; ++i) {
             let currRuleName = this._passedRules[i]
-            this.getRule(currRuleName).fireAction()
+            this.getRule(currRuleName).fireAction(obj)
         }
     }
 
@@ -268,7 +277,7 @@ export class RuleForge {
         return this
     }
 
-    public AddAction(actionFunction: () => void): this {
+    public AddAction(actionFunction: (obj?: any) => void): this {
         this.ruleCheck()
 
         const ruleset = this._rulesetMap.get(this.lastRuleset)
@@ -280,7 +289,7 @@ export class RuleForge {
         return this
     }
 
-    public AddActionToRule(rulesetName: string, ruleName: string, actionFunction: () => void): this {
+    public AddActionToRule(rulesetName: string, ruleName: string, actionFunction: (obj?: any) => void): this {
         const ruleset = this._rulesetMap.get(rulesetName)
         if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
@@ -293,7 +302,7 @@ export class RuleForge {
         const ruleset = this._rulesetMap.get(rulesetName)
         if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
-        ruleset.getRule(ruleName). action = this.baseAction
+        ruleset.getRule(ruleName).action = this.baseAction
 
         return this
     }
@@ -366,13 +375,13 @@ export class RuleForge {
         return ruleset.results
     }
 
-    public FireAllPasses(): this {
+    public FireAllPasses(obj?: any): this {
         this.ruleCheck()
 
         const ruleset = this._rulesetMap.get(this.lastRuleset)
         if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
 
-        ruleset.fireAllPasses()
+        ruleset.fireAllPasses(obj)
         
         return this
     }
