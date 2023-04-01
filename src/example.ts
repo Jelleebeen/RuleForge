@@ -1,9 +1,10 @@
-import { Ruleset, Condition, Rule, Action, RULE } from "./ruleset/ruleset"
+import { Ruleset, Condition, Rule, Action, OUTCOME } from "./ruleset/ruleset"
 import type { Fact } from "./ruleset/ruleset"
 
 export module runExample {
     // Fact to run through the ruleset
     const fact1: Fact = {
+        factName: 'fact1',
         val1: true,
         val2: 'rule2',
         val3: 'passme'
@@ -20,9 +21,9 @@ export module runExample {
 
     // Conditions for the rules to pass, fail or call another rule.
     const cond1 = new Condition('cond1', (fact) => {
-        if (fact.hasOwnProperty('val1')) return RULE.PASS
+        if (fact.hasOwnProperty('val1')) return OUTCOME.PASS
 
-        return RULE.FAIL
+        return OUTCOME.FAIL
     })
 
     const cond2 = new Condition('cond2', (fact) => {
@@ -30,13 +31,13 @@ export module runExample {
             return fact['val2']
         }
 
-        return RULE.FAIL
+        return OUTCOME.FAIL
     })
 
     const cond3 = new Condition('cond3', (fact) => {
-        if (fact.hasOwnProperty('val3')) return RULE.PASS
+        if (fact.hasOwnProperty('val3')) return OUTCOME.PASS
 
-        return RULE.FAIL
+        return OUTCOME.FAIL
     })
 
 

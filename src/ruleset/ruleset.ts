@@ -1,4 +1,4 @@
-export enum RULE {
+export enum OUTCOME {
     PASS = 'PASS',
     ERROR = 'ERROR',
     FAIL = 'FAIL'
@@ -10,21 +10,29 @@ interface IRule {
     action: IAction
     addCondition: (condition: ICondition) => void
     removeCondition: (conditionName: string) => void
-    testConditions: (fact: Fact) => string | RULE
+    testConditions: (fact: Fact) => string | OUTCOME
     fireAction: () => void
 }
 
 interface ICondition {
     name: string
-    test: (fact: Fact) => string | RULE
+    test: (fact: Fact) => string | OUTCOME
 }
 
 interface IAction {
     act: () => void
 }
 
+export type Result = {
+    rulesetName: string,
+    ruleName: string,
+    factName: string,
+    outcome: string,
+}
+
 export type Fact = {
     [key: string]: any
+    factName: string
 }
 
 export class Action implements IAction {
@@ -42,9 +50,9 @@ export class Condition implements ICondition {
         return this._name
     }
 
-    public test: (fact: Fact) => string | RULE
+    public test: (fact: Fact) => string | OUTCOME
 
-    constructor(name: string, testFunction: (fact: Fact) => string | RULE) {
+    constructor(name: string, testFunction: (fact: Fact) => string | OUTCOME) {
         this._name = name
         this.test = testFunction
     }
@@ -78,15 +86,15 @@ export class Rule implements IRule {
         if (condIndex > -1) this.conditions.splice(condIndex, 1)
     }
 
-    public testConditions(fact: Fact): string | RULE {
+    public testConditions(fact: Fact): string | OUTCOME {
         for(let i = 0; i < this._conditions.length; ++i) {
             // Return false as soon as a condition is not met
             let result = this._conditions[i].test(fact)
-            if(result !== RULE.PASS) return result
+            if(result !== OUTCOME.PASS) return result
         }
 
         // If no conditions were returned, must all have been met.
-        return RULE.PASS
+        return OUTCOME.PASS
     }
 
     public fireAction(): void {
@@ -99,9 +107,14 @@ export class Ruleset {
     private readonly _name: string
     private readonly _ruleMap: Map<string, IRule>
     private _passedRules: string[] = []
+    private _results: Result[] = []
     
     public get name() {
         return this._name
+    }
+
+    public get results() {
+        return this._results
     }
 
     constructor(name: string) {
@@ -124,38 +137,53 @@ export class Ruleset {
         this._ruleMap.delete(ruleName)
     }
 
-    public runRules(fact: Fact, fireOnPass:boolean = true, failOnInfinite:boolean = false): boolean {
+    public runRules(fact: Fact, fireOnPass:boolean = true, failOnInfinite:boolean = false): Result {
+        const lastRuleName = ''
         // Loop through, test the conditions and fire the actions on each rule in the ruleMap
         this._passedRules = []
+        this._results = []
+        let result: Result = { rulesetName: this.name, ruleName: '', factName: fact.name, outcome: '' }
 
         rulemaploop:
         for(let [key, value] of this._ruleMap) {
-            let result = value.testConditions(fact) // Result of running the conditions on this rule.
-            let currRuleName: string = key // The name of this rule.
+            
+            result
+            result.outcome = value.testConditions(fact) // Result of running the conditions on this rule.
+            result.ruleName = key // The name of this rule.
+            this._results.push(result)
             const seenRules: string[] = [key] // A list of rules we have seen in this iteration
 
-            while(result !== RULE.PASS) {
-                if (result === RULE.FAIL) return false // This rule failed, so return false.
-                if (result === RULE.ERROR) throw new Error(`An error occurred when running rule '${currRuleName}'`)
+            while(result.outcome !== OUTCOME.PASS) {
+                // If this rule failed, return failed .
+                if (result.outcome === OUTCOME.FAIL) return result
 
-                if (seenRules.includes(result)) {
-                    if (failOnInfinite) return false // Set to fail when an infinite loop is found, so return false.
-                    throw new Error(`An infinite loop happened when running rule '${currRuleName}', it loops back to a rule that has run before ('${result}')`)
+                // If an error is detected, throw that there was an error. TODO -- Store that error in the result.
+                if (result.outcome === OUTCOME.ERROR) throw new Error(`An error occurred when running rule '${result.ruleName}'`)
+
+                if (seenRules.includes(result.outcome)) {
+                    // We've been here before, so will eventually return here in an infinite loops from the same conditions.
+                    // Set to fail when an infinite loop is found, so return as a fail.
+                    // TODO -- consider fireOnPass actions that mutate the facts.
+                    if (failOnInfinite) {
+                        result.outcome = OUTCOME.FAIL
+                        return result
+                    }
+                    throw new Error(`An infinite loop happened when running rule '${result.ruleName}', it loops back to a rule that has run before ('${result.outcome}')`)
                 }
-                currRuleName = result
+                result.ruleName = result.outcome
 
-                seenRules.push(currRuleName)
-                result = this.getRule(currRuleName).testConditions(fact)
+                seenRules.push(result.ruleName)
+                result.outcome = this.getRule(result.ruleName).testConditions(fact)
+                this._results.push(result)
             }
 
             // This rule passed all conditions
             this._passedRules.push(key)
             if (fireOnPass) value.fireAction() // If fireOnPass is enabled, fire action on rule now
             continue rulemaploop
-
         }
 
-        return true
+        return result
     }
 
     public fireAllPasses(): void {
@@ -163,7 +191,7 @@ export class Ruleset {
             let currRuleName = this._passedRules[i]
             this.getRule(currRuleName).fireAction()
         }
-    }  
+    }
 
 }
 
@@ -174,7 +202,8 @@ export class RuleForge {
     private _factMap: Map<string, Fact> = new Map<string, Fact>
     private lastRuleset: string = ''
     private lastRule: string = ''
-    private lastResult: string = ''
+    private lastResult: Result = { rulesetName: '', ruleName: '', factName: '', outcome: ''}
+    private lastResults: Result[] = []
           
     public NewRuleset(name: string): this {    
         const newRuleset: Ruleset = new Ruleset(name)
@@ -306,23 +335,35 @@ export class RuleForge {
         const ruleset = this._rulesetMap.get(this.lastRuleset)
         if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
 
-        const result: boolean = ruleset.runRules(fact, fireOnPass, failOnInfinite)
-
-        this.lastResult = result ? RULE.PASS : RULE.FAIL
+        this.lastResult = ruleset.runRules(fact, fireOnPass, failOnInfinite)
 
         return this
     }
 
-    public GetResult(): boolean {
+    public GetLastResult(): Result {
         this.ruleCheck()
 
-        if (this.lastResult === '') throw new Error(`The rules have not been run for this RuleForge (did you call RunRules yet?)`)
+        if (this.lastResult.outcome === '') throw new Error(`The rules have not been run for this RuleForge (did you call RunRules yet?)`)
 
-        if (this.lastResult === RULE.PASS) return true
-        if (this.lastResult === RULE.FAIL) return false
+        return this.lastResult
+    }
 
-        // Result not expected (not blank, pass or fail). Throw error.
-        throw new Error(`An unknown error occurred. Could not read the results for this RuleForge`)
+    public GetResults(): Result[] {
+        this.ruleCheck()
+
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+
+        this.lastResults.concat(ruleset.results)
+
+        return ruleset.results
+    }
+
+    public GetResultsOnRuleset(rulesetName: string): Result[] {
+        const ruleset = this._rulesetMap.get(rulesetName)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
+
+        return ruleset.results
     }
 
     public FireAllPasses(): this {
@@ -355,15 +396,15 @@ export class RuleForge {
     public BulkRunRules(fireOnPass: boolean = true, failOnInfinite: boolean = false): this {
         this.ruleCheck()
 
+        this.lastResults = []
+
         const ruleset = this._rulesetMap.get(this.lastRuleset)
         if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
 
-        // TODO - Create a results object for storing the results of each fact on each rule in each ruleset.
-        // TODO - Create a function for returning the results of this bulk run.
         this._factMap.forEach((fact) => {
-            const result: boolean = ruleset.runRules(fact, fireOnPass, failOnInfinite)
-
-            this.lastResult = result ? RULE.PASS : RULE.FAIL
+            const result: Result = ruleset.runRules(fact, fireOnPass, failOnInfinite)
+            this.lastResult = result
+            this.GetResults() // Add results of each run to lastResults array.
         })
 
         return this
@@ -374,12 +415,18 @@ export class RuleForge {
         if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
         this._factMap.forEach((fact) => {
-            const result: boolean = ruleset.runRules(fact, fireOnPass, failOnInfinite)
-
-            this.lastResult = result ? RULE.PASS : RULE.FAIL
+            const result: Result = ruleset.runRules(fact, fireOnPass, failOnInfinite)
+            this.lastResult = result
+            this.GetResults() // Add results of each run to lastResults array.
         })
 
         return this
+    }
+
+    public GetBulkResults(): Result[] {
+        this.ruleCheck()     
+
+        return this.lastResults
     }
 
 }
