@@ -1,10 +1,10 @@
 {
-  "name": "ruleforge",
-  "version": "0.0.7",
+  "name": "@ruleforge/ruleforge",
+  "version": "0.0.8",
   "repository": "https://github.com/Jelleebeen/RuleForge",
   "description": "A library for adding rules to your web app.",
   "scripts": {
-    "compile": "rd /s /q dist && tsc && tsc --build tsconfig.es5.json",
+    "compile": "rd /s /q dist && tsc && tsc --build tsconfig.es5.json && xcopy README.md dist && xcopy package.json.backup dist",
     "docs": "typedoc --out docs src/index.ts"
   },
   "author": "Dave Hurst",
