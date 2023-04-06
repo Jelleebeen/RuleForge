@@ -20,6 +20,7 @@ export interface IRule {
     action: IAction
     addCondition: (condition: ICondition) => void
     removeCondition: (conditionName: string) => void
+    updateCondition: (conditionName: string, test: (fact: Fact) => string) => void
     testConditions: (fact: Fact) => string | OUTCOME
     fireAction: (obj?: any) => void
 }
@@ -94,6 +95,12 @@ export class Rule implements IRule {
         const condIndex = this.conditions.findIndex((cond) => cond.name === conditionName)
 
         if (condIndex > -1) this.conditions.splice(condIndex, 1)
+    }
+
+    public updateCondition(conditionName: string, test: (fact: Fact) => string): void {
+        const condIndex = this.conditions.findIndex((cond) => cond.name === conditionName)
+
+        if (condIndex > -1) this.conditions[condIndex].test = test
     }
 
     public testConditions(fact: Fact): string | OUTCOME {
