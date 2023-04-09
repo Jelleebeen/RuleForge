@@ -1,39 +1,49 @@
-import { RuleForge, OUTCOME, Result } from "./ruleset/ruleset"
-import type { Fact } from "./ruleset/ruleset"
+import { RuleForge, OUTCOME, Result, Fact, COMPARE } from "./ruleset/ruleset"
+import type { FactData } from "./ruleset/ruleset"
 
 export module runExample {
-    // Fact to run through the ruleset
-    const fact1: Fact = {
-        factName: 'fact1',
-        val1: true,
-        val2: 'rule3',
-        val3: 'failme'
+    // Data for Fact
+    const fact1Data: FactData = {
+        subject1: {
+            attribute1: true,
+            attribute2: 'rule3',
+        },
+        subject2: {
+            attribute3: 'passme'
+        }
     }
+
+    // Fact to run through the ruleset
+    const fact1: Fact = new Fact('fact1', fact1Data)
 
     const testFunction = () => {
         const rf = new RuleForge().NewRuleset('firstRS')
         const results: Result[] = rf
             .AddRule('rule1')
             .AddAction(() => { console.log('act1') })
-            .AddCondition('cond1', (fact) => { 
+            .AddCondition('cond1', (fact) => {
+                if(fact.hasSubject('subject1') && fact.hasAttribute('subject1', 'attribute1'))
                 return OUTCOME.PASS
+
+                return OUTCOME.FAIL
             })
             .AddCondition('cond2', (fact) => {
-                if (!!fact.hasOwnProperty('val1')) return OUTCOME.PASS
+                if (fact.hasSubject('subject1') && fact.hasValue('subject1', 'attribute1', COMPARE.EQUAL, 'true')) return OUTCOME.PASS
+
                 return OUTCOME.FAIL
             })
             .AddRule('rule2')
-            .AddAction(() => { console.log('act2')})
+            .AddAction(() => { console.log('act2 - this should not show when rule3 fails')})
             .AddCondition('cond3', (fact) => {
-                if (!!fact.hasOwnProperty('val2')) return fact['val2']
+                if (fact.hasSubject('subject1') && fact.hasAttribute('subject1', 'attribute2')) return fact.factData['subject1']['attribute2']
     
                 return OUTCOME.FAIL
             })
             .AddRule('rule3')
-            .AddAction(() => { console.log('This should not show')})
+            .AddAction(() => { console.log('act3 - this should not show if attribute3 is changed to failme')})
             .AddCondition('cond4', (fact) => {
-                if (!!fact.hasOwnProperty('val3')) {
-                    if (fact['val3'] === 'failme') return OUTCOME.FAIL
+                if (fact.hasSubject('subject2')) {
+                    if (fact.hasValue('subject2', 'attribute3', COMPARE.EQUAL, 'failme')) return OUTCOME.FAIL
                 } else {
                     return OUTCOME.FAIL
                 }

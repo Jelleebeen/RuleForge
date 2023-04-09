@@ -1,14 +1,7 @@
-import { Ruleset, Condition, Rule, Action, OUTCOME } from "./ruleset/ruleset"
-import type { Fact } from "./ruleset/ruleset"
+import { Ruleset, Condition, Rule, Action, OUTCOME, Fact, COMPARE } from "./ruleset/ruleset"
+import type { FactData } from "./ruleset/ruleset"
 
 export module runExample {
-    // Fact to run through the ruleset
-    const fact1: Fact = {
-        factName: 'fact1',
-        val1: true,
-        val2: 'rule2',
-        val3: 'passme'
-    }
 
     // Actions for the rules when fired.
     const act1 = new Action(() => {
@@ -21,23 +14,23 @@ export module runExample {
 
     // Conditions for the rules to pass, fail or call another rule.
     const cond1 = new Condition('cond1', (fact) => {
-        if (fact.hasOwnProperty('val1')) return OUTCOME.PASS
+        if (fact.hasSubject('subject1') && fact.hasAttribute('subject1', 'attribute1')) return OUTCOME.PASS
 
         return OUTCOME.FAIL
     })
 
     const cond2 = new Condition('cond2', (fact) => {
-        if (fact.hasOwnProperty('val2')) {
-            return fact['val2']
+        if (fact.hasSubject('subject1') && fact.hasAttribute('subject1', 'attribute2')) {
+            return fact.factData['subject1']['attribute2'] // 'rule2' - chaining rules 1 & 2
         }
 
         return OUTCOME.FAIL
     })
 
     const cond3 = new Condition('cond3', (fact) => {
-        if (fact.hasOwnProperty('val3')) return OUTCOME.PASS
+        if (fact.hasSubject('subject1') && fact.hasValue('subject2', 'attribute3', COMPARE.EQUAL, 'failme' )) return OUTCOME.FAIL
 
-        return OUTCOME.FAIL
+        return OUTCOME.PASS
     })
 
 
@@ -50,6 +43,20 @@ export module runExample {
 
     exampleRuleset.addRule(rule1)
     exampleRuleset.addRule(rule2)
+
+    // Data for Fact
+    const fact1Data: FactData = {
+        subject1: {
+            attribute1: true,
+            attribute2: 'rule2',
+        },
+        subject2: {
+            attribute3: 'passme' // Change to 'failme' to see when chained rules fail
+        }
+    }
+
+    // Fact to run through the ruleset
+    const fact1: Fact = new Fact('fact1', fact1Data)
 
     exampleRuleset.runRules(fact1, true, false)
 }

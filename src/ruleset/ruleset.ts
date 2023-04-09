@@ -4,6 +4,17 @@ export enum OUTCOME {
     FAIL = 'FAIL'
 }
 
+export enum COMPARE {
+    EQUAL = 'EQUAL',
+    NOTEQUAL = 'NOTEQUAL',
+    CONTAINS = 'CONTAINS',
+    NOTCONTAINS = 'NOTCONTAINS',
+    GREATERTHAN = 'GREATERTHAN',
+    LESSTHAN = 'LESSTHAN',
+    GREATEROREQUAL = 'GREATEROREQUAL',
+    LESSOREQUAL = 'LESSOREQUAL'
+}
+
 export interface IRuleset {
     name: string
     results: Result[]
@@ -41,9 +52,137 @@ export type Result = {
     outcome: string,
 }
 
-export type Fact = {
+/* TODO - Shape of fact will be:
+{ 
+    subject1Name: {
+        attribute1Name: {
+            value: any
+        },
+        attribute2Name: {
+            value: {
+
+            }
+        }
+    },
+
+    subject2Name: {
+        attribute3Name: {
+            value: any
+        }
+    }
+
+}
+
+*/
+export type FactData = {
+    [key: string]: any
+}
+
+export interface IFact {
     [key: string]: any
     factName: string
+    hasSubject: (subjectName: string) => boolean
+    hasAttribute: (subjectName: string, attributeName: string) => boolean
+    hasValue: (subjectName: string, attributeName: string, compare: COMPARE, value: string) => boolean
+}
+
+export class Fact implements IFact {
+    [key: string]: any
+    private _factName: string
+    private _factData: FactData
+
+    public get factName(): string { return this._factName }
+
+    public get factData(): FactData { return this._factData }
+
+    constructor(factName: string, factData: FactData) {
+        this._factName = factName
+        this._factData = factData
+    }
+
+    public hasSubject(subjectName: string): boolean {
+        return this._factData.hasOwnProperty(subjectName)
+    }
+
+    public hasAttribute(subjectName: string, attributeName: string): boolean {
+        if (!this._factData.hasOwnProperty(subjectName)) return false
+
+        return this._factData[subjectName].hasOwnProperty(attributeName)
+
+    }
+ 
+    public hasValue(subjectName: string, attributeName: string, compare: COMPARE, value: string): boolean {
+        if(!this._factData.hasOwnProperty(subjectName)) return false
+
+        if(!this._factData[subjectName].hasOwnProperty(attributeName)) return false
+
+        const attribute = this._factData[subjectName][attributeName]
+
+        switch (compare) {
+            case COMPARE.EQUAL:
+                if (typeof attribute === 'number')
+                return attribute == parseInt(value)
+
+                return attribute.toString() == value
+            break
+            
+            case COMPARE.NOTEQUAL:
+                if (typeof attribute === 'number')
+                return attribute == parseInt(value)
+
+                return attribute.toString() != value
+            break
+
+            case COMPARE.CONTAINS:
+                if (typeof attribute !== 'object') return false
+
+                attribute.forEach((item: any) => {
+                    if (typeof item === 'number' && item === parseInt(value)) return true
+
+                    if (item.toString() == value) return true 
+                })
+
+                return false
+            break
+
+            case COMPARE.NOTCONTAINS:
+                if (typeof attribute !== 'object') return true
+
+                attribute.forEach((item: any) => {
+                    if (typeof item === 'number' && item === parseInt(value)) return false
+
+                    if (item.toString() == value) return false 
+                })
+
+                return true
+            break
+
+            case COMPARE.GREATERTHAN:
+                if (typeof attribute !== 'number') return false
+                
+                return attribute > parseInt(value)
+            break
+
+            case COMPARE.LESSTHAN:
+                if (typeof attribute !== 'number') return false
+                
+                return attribute < parseInt(value)
+            break
+
+            case COMPARE.GREATEROREQUAL:
+                if (typeof attribute !== 'number') return false
+                
+                return attribute >= parseInt(value)
+
+            case COMPARE.LESSOREQUAL:
+                if (typeof attribute !== 'number') return false
+                
+                return attribute <= parseInt(value)
+
+            default:
+                return false
+        }
+    }
 }
 
 export class Action implements IAction {
@@ -179,7 +318,7 @@ export class Ruleset implements IRuleset {
                 if (seenRules.includes(result.outcome)) {
                     // We've been here before, so will eventually return here in an infinite loops from the same conditions.
                     // Set to fail when an infinite loop is found, so return as a fail.
-                    // TODO -- consider fireOnPass actions that mutate the facts.
+                    // TODO -- consider fireOnPass actions that mutate the facts OR save to a WME (Working Memory Elements)
                     if (failOnInfinite) {
                         result.outcome = OUTCOME.FAIL
                         return result
