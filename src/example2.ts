@@ -10,6 +10,11 @@ export module runExample {
         },
         subject2: {
             attribute3: 'passme'
+        },
+        subject3: {
+            attribute4: {
+                message: 'This is a message in the fact data'
+            }
         }
     }
 

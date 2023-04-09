@@ -1,4 +1,4 @@
-import { Ruleset, Condition, Rule, Action, OUTCOME, Fact, COMPARE } from "./ruleset/ruleset"
+import { Ruleset, Condition, StandardCondition, Rule, Action, OUTCOME, Fact, COMPARE } from "./ruleset/ruleset"
 import type { FactData } from "./ruleset/ruleset"
 
 export module runExample {
@@ -27,11 +27,7 @@ export module runExample {
         return OUTCOME.FAIL
     })
 
-    const cond3 = new Condition('cond3', (fact) => {
-        if (fact.hasSubject('subject1') && fact.hasValue('subject2', 'attribute3', COMPARE.EQUAL, 'failme' )) return OUTCOME.FAIL
-
-        return OUTCOME.PASS
-    })
+    const cond3 = new StandardCondition('cond3', 'subject2', 'attribute3', COMPARE.EQUAL, 'failme', OUTCOME.FAIL, OUTCOME.PASS)
 
 
     // Rules to run from ruleset

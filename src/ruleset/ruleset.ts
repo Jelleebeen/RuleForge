@@ -55,20 +55,12 @@ export type Result = {
 /* TODO - Shape of fact will be:
 { 
     subject1Name: {
-        attribute1Name: {
-            value: any
-        },
-        attribute2Name: {
-            value: {
-
-            }
-        }
+        attribute1Name: value<any>,
+        attribute2Name: value<any>
     },
 
     subject2Name: {
-        attribute3Name: {
-            value: any
-        }
+        attribute3Name: value<any>
     }
 
 }
@@ -209,44 +201,73 @@ export class Condition implements ICondition {
 
 }
 
+export class StandardCondition implements ICondition {
+    private readonly _name: string
+
+    public get name() {
+        return this._name
+    }
+
+    public test: (fact: Fact) => string | OUTCOME
+
+    constructor(
+        name: string, 
+        subject: string, 
+        attribute: string, 
+        compare: COMPARE, 
+        value: string, 
+        passOutcome: string | OUTCOME = OUTCOME.PASS, 
+        failOutcome: string | OUTCOME = OUTCOME.FAIL
+        ) {
+            this._name = name
+            this.test = (fact) => {
+                if (fact.hasValue(subject, attribute, compare, value)) return passOutcome
+
+                return failOutcome
+        }
+    }
+}
+
 export class Rule implements IRule {   
     private readonly _name: string
     private _action: IAction
-    private _conditions: ICondition[] = [] // TODO - Replace with Hash map?
+    private _conditionMap: Map<string, ICondition>
     
 
     public get name() { return this._name }
     public get action() { return this._action}
     public set action(val: IAction) { this._action = val }
-    public get conditions() { return this._conditions}
+    public get conditions() { return Array.from(this._conditionMap.values()) }
 
     constructor(name: string, action: IAction, conditions?: ICondition[]) {
         this._name = name
         this._action = action        
-        this._conditions = !!conditions? conditions : []
+        this._conditionMap = new Map<string, ICondition>
+        if(conditions !== undefined) {
+            for(let i = 0, n = conditions.length; i < n; ++i) {
+                this._conditionMap.set(conditions[i].name, conditions[i])
+            }
+        }
     }
 
     public addCondition(condition: ICondition): void {
-        this.conditions.push(condition)
+        this._conditionMap.set(condition.name, condition)
     }
 
     public removeCondition(conditionName: string): void {
-        const condIndex = this.conditions.findIndex((cond) => cond.name === conditionName)
-
-        if (condIndex > -1) this.conditions.splice(condIndex, 1)
+        this._conditionMap.delete(conditionName)
     }
 
     public updateCondition(conditionName: string, test: (fact: Fact) => string): void {
-        const condIndex = this.conditions.findIndex((cond) => cond.name === conditionName)
-
-        if (condIndex > -1) this.conditions[condIndex].test = test
+        const condition = this._conditionMap.get(conditionName)
+        if (condition === undefined) throw new Error(`Could not find and update condition '${conditionName}'`)
+        condition.test = test
     }
 
     public testConditions(fact: Fact): string | OUTCOME {
-        for(let i = 0; i < this._conditions.length; ++i) {
-            // Return false as soon as a condition is not met
-            let result = this._conditions[i].test(fact)
-            if(result !== OUTCOME.PASS) return result
+        for(let [key, value] of this._conditionMap) {
+            let result: string | OUTCOME = value.test(fact)
+            if (result !== OUTCOME.PASS) return result
         }
 
         // If no conditions were returned, must all have been met.
