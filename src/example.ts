@@ -1,8 +1,11 @@
-import { Ruleset, Condition, StandardCondition, Rule, Action, OUTCOME, Fact, COMPARE } from "./ruleset/ruleset"
+import { Ruleset, Condition, StandardCondition, Rule, Action, OUTCOME, Fact, COMPARE, KnowledgeBase } from "./ruleset/ruleset"
 import type { FactData } from "./ruleset/ruleset"
 
 export module runExample {
 
+    // Knowledge Base to store any memory during runs.
+    const kb = new KnowledgeBase()
+    
     // Actions for the rules when fired.
     const act1 = new Action(() => {
         console.log('Act1')
@@ -31,8 +34,8 @@ export module runExample {
 
 
     // Rules to run from ruleset
-    const rule1 = new Rule('rule1', act1, [cond1, cond2])
-    const rule2 = new Rule('rule2', act2, [cond3])
+    const rule1 = new Rule('rule1', act1, kb, [cond1, cond2])
+    const rule2 = new Rule('rule2', act2, kb, [cond3])
 
     // Ruleset to run the rules from
     const exampleRuleset = new Ruleset("Example")

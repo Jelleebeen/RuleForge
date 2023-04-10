@@ -38,7 +38,7 @@ export interface IRule {
 
 export interface ICondition {
     name: string
-    test: (fact: Fact) => string | OUTCOME
+    test: (fact: Fact, knowledgeBase?: KnowledgeBase) => string | OUTCOME
 }
 
 export interface IAction {
@@ -73,6 +73,7 @@ export type FactData = {
 export interface IFact {
     [key: string]: any
     factName: string
+    factData: FactData
     hasSubject: (subjectName: string) => boolean
     hasAttribute: (subjectName: string, attributeName: string) => boolean
     hasValue: (subjectName: string, attributeName: string, compare: COMPARE, value: string) => boolean
@@ -87,9 +88,9 @@ export class Fact implements IFact {
 
     public get factData(): FactData { return this._factData }
 
-    constructor(factName: string, factData: FactData) {
-        this._factName = factName
-        this._factData = factData
+    constructor(name: string, data: FactData) {
+        this._factName = name
+        this._factData = data
     }
 
     public hasSubject(subjectName: string): boolean {
@@ -177,11 +178,157 @@ export class Fact implements IFact {
     }
 }
 
+export interface IRelationship {
+    relationshipName: string,
+    relationshipDescription: string,
+    subject: string
+    relation: string,
+    relative: string
+}
+
+export class Relationship implements IRelationship {
+    private readonly _relationshipName: string
+    private _relationshipDescription: string
+    private _relation: string
+    private _subject: string
+    private _relative: string
+
+    public get relationshipName() { return this._relationshipName }
+    public get relationshipDescription() { return this._relationshipDescription }
+    public get relation() { return this._relation }
+    public get subject() { return this._subject }
+    public get relative() { return this._relative }
+
+    constructor(name: string , description: string, relation: string, subject: string, relative: string) {
+        this._relationshipName = name
+        this._relationshipDescription = description
+        this._relation = relation
+        this._subject = subject // Key for memory element hash map.
+        this._relative = relative 
+    }
+}
+
+export interface IKnowledgeBase {
+    relationships: Map<string, IRelationship[]> // relationship.relative, relationship
+    memoryElements: Map<string, IFact[]> // fact.key (such as fact['subject1'] would be 'subject1'), fact.
+
+    hasRelationship: (relative: string) => boolean
+    getRelationships: (relative: string) => IRelationship[]
+    addRelationship: (relationship: IRelationship) => void
+    removeRelationship: (relationship: IRelationship) => void
+    removeRelation: (relative: string) => void
+
+    hasMemoryElement: (subject: string) => boolean
+    getMemoryElement: (subject: string) => IFact[]
+    getMemoryElementsByFact: (fact: IFact) => IFact[]
+    addMemoryElement: (subject: string, fact: IFact) => void
+    removeMemoryElement: (subject: string) => void
+}
+
+export class KnowledgeBase implements IKnowledgeBase {
+    private _relationshipMap: Map<string, IRelationship[]> // A subjects relationships with other subjects.
+    private _memoryElementMap: Map<string, IFact[]> // Facts about a subject
+
+    public get relationships() {
+        return this._relationshipMap
+    }
+
+    public get memoryElements() {
+        return this._memoryElementMap
+    }
+
+    constructor() {
+        this._relationshipMap = new Map<string, IRelationship[]>
+        this._memoryElementMap = new Map<string, IFact[]>
+    }
+
+    public hasRelationship (relative: string): boolean {
+        return this._relationshipMap.has(relative)
+    }
+
+    public getRelationships (relative: string): IRelationship[] {
+        const relationships = this._relationshipMap.get(relative)
+
+        if (relationships === undefined) return []
+
+        return relationships
+    }
+
+    public addRelationship (relationship: IRelationship): void {
+        const relationships = this._relationshipMap.get(relationship.relative)
+
+        if (relationships === undefined) {
+            this._relationshipMap.set(relationship.relative, [relationship])
+        }
+    }
+
+    public removeRelationship (relationship: IRelationship): void {
+        this._relationshipMap.delete(relationship.relative)
+    }
+
+    public removeRelation (relative: string) : void {
+        this._relationshipMap.delete(relative)
+    }
+
+    public hasMemoryElement (subject: string): boolean {
+        return this._memoryElementMap.has(subject)
+    }
+
+    public getMemoryElement (subject: string): IFact[] {
+        const memoryElement = this._memoryElementMap.get(subject)
+        
+        if (memoryElement === undefined) return []
+
+        return memoryElement
+    }
+
+    public getMemoryElementsByFact (fact: IFact): IFact[] {
+        const facts: IFact[] = []
+
+        for(const [key, value] of Object.entries(fact.factData)) {
+            const elements = this._memoryElementMap.get(key)
+            if (elements !== undefined) facts.push(...elements)
+        }
+
+        return facts
+    }
+
+    public addMemoryElement (subject: string, fact: IFact): void {
+        const elements = this._memoryElementMap.get(subject)
+        if (elements === undefined) {
+            this._memoryElementMap.set(subject, [fact])
+        } else {
+            elements.push(fact) // TODO - test that this is applied by reference to the map.
+        }    
+    }
+
+    public removeMemoryElement (subject: string): void {
+        this._memoryElementMap.delete(subject)
+    }
+}
+
 export class Action implements IAction {
     public act = (obj?: any) => {}
 
     constructor(actFunction: (obj?: any) => void) {
         this.act = actFunction
+    }
+}
+
+export class KnowledgeAction implements IAction {
+    private knowledgeBase: KnowledgeBase
+    private actFunction = (obj?: any) => {}
+    private fact: IFact // Fact to be applied when this action is fired, defined up front for this type of action.
+    
+    public act (obj?: any) {
+        this.knowledgeBase.addMemoryElement(Object.keys(this.fact.factData)[0], this.fact)
+        this.actFunction()
+    }
+
+    constructor(knowledgeBase: KnowledgeBase, actFunction: (obj?: any) => void, fact: IFact) {
+        this.knowledgeBase = knowledgeBase
+        this.actFunction = actFunction
+        this.fact = fact // Subject this refers to is defined up front for this type of action.
     }
 }
 
@@ -192,7 +339,7 @@ export class Condition implements ICondition {
         return this._name
     }
 
-    public test: (fact: Fact) => string | OUTCOME
+    public test: (fact: Fact, knowledgeBase?: KnowledgeBase) => string | OUTCOME
 
     constructor(name: string, testFunction: (fact: Fact) => string | OUTCOME) {
         this._name = name
@@ -208,7 +355,7 @@ export class StandardCondition implements ICondition {
         return this._name
     }
 
-    public test: (fact: Fact) => string | OUTCOME
+    public test: (fact: Fact, knowledgeBase?: IKnowledgeBase) => string | OUTCOME
 
     constructor(
         name: string, 
@@ -232,6 +379,7 @@ export class Rule implements IRule {
     private readonly _name: string
     private _action: IAction
     private _conditionMap: Map<string, ICondition>
+    private _knowledgeBase: KnowledgeBase
     
 
     public get name() { return this._name }
@@ -239,7 +387,7 @@ export class Rule implements IRule {
     public set action(val: IAction) { this._action = val }
     public get conditions() { return Array.from(this._conditionMap.values()) }
 
-    constructor(name: string, action: IAction, conditions?: ICondition[]) {
+    constructor(name: string, action: IAction, knowledgeBase: KnowledgeBase, conditions?: ICondition[]) {
         this._name = name
         this._action = action        
         this._conditionMap = new Map<string, ICondition>
@@ -248,6 +396,7 @@ export class Rule implements IRule {
                 this._conditionMap.set(conditions[i].name, conditions[i])
             }
         }
+        this._knowledgeBase = knowledgeBase
     }
 
     public addCondition(condition: ICondition): void {
@@ -266,7 +415,7 @@ export class Rule implements IRule {
 
     public testConditions(fact: Fact): string | OUTCOME {
         for(let [key, value] of this._conditionMap) {
-            let result: string | OUTCOME = value.test(fact)
+            let result: string | OUTCOME = value.test(fact, this._knowledgeBase)
             if (result !== OUTCOME.PASS) return result
         }
 
@@ -380,6 +529,11 @@ export class RuleForge {
     private lastRule: string = ''
     private lastResult: Result = { rulesetName: '', ruleName: '', factName: '', outcome: ''}
     private lastResults: Result[] = []
+    private knowledgeBase: KnowledgeBase = new KnowledgeBase()
+
+    constructor(knowledgeBase?: KnowledgeBase) {
+        if (knowledgeBase !== undefined) this.knowledgeBase = knowledgeBase
+    }
           
     public NewRuleset(name: string): this {    
         const newRuleset: Ruleset = new Ruleset(name)
@@ -419,7 +573,7 @@ export class RuleForge {
         const ruleset = this._rulesetMap.get(this.lastRuleset)
         if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
         
-        ruleset.addRule(new Rule(ruleName, action))
+        ruleset.addRule(new Rule(ruleName, action, this.knowledgeBase))
 
         this.lastRule = ruleName
 
@@ -430,7 +584,7 @@ export class RuleForge {
         const ruleset = this._rulesetMap.get(rulesetName) 
         if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))     
         
-        ruleset.addRule(new Rule(ruleName, action))
+        ruleset.addRule(new Rule(ruleName, action, this.knowledgeBase))
 
         return this
     }
@@ -456,11 +610,47 @@ export class RuleForge {
         return this
     }
 
+    public AddKnowledgeAction(actionFunction: (obj?: any) => void, name: string, subject: string, attribute: string, value: any): this {
+        this.ruleCheck()
+
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+
+        const rule = ruleset.getRule(this.lastRule)
+        
+        const knowledgeData: FactData = {}
+        knowledgeData[subject] = {}
+        knowledgeData[subject][attribute] = value
+
+        const knowledgeFact = new Fact(name, knowledgeData)
+
+
+        rule.action = new KnowledgeAction(this.knowledgeBase, actionFunction, knowledgeFact)
+
+        return this
+    }
+
     public AddActionToRule(rulesetName: string, ruleName: string, actionFunction: (obj?: any) => void): this {
         const ruleset = this._rulesetMap.get(rulesetName)
         if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
         ruleset.getRule(ruleName).action = new Action(actionFunction)
+
+        return this
+    }
+
+    public AddKnowledgeActionToRule(rulesetName: string, ruleName: string, actionFunction: (obj?: any) => void, name: string, 
+                                    subject: string, attribute: string, value: any): this {
+        const ruleset = this._rulesetMap.get(rulesetName)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
+
+        const knowledgeData: FactData = {}
+        knowledgeData[subject] = {}
+        knowledgeData[subject][attribute] = value
+
+        const knowledgeFact = new Fact(name, knowledgeData)
+
+        ruleset.getRule(ruleName).action = new KnowledgeAction(this.knowledgeBase, actionFunction, knowledgeFact)
 
         return this
     }
@@ -474,7 +664,7 @@ export class RuleForge {
         return this
     }
 
-    public AddCondition(conditionName: string, testFunction: (fact: Fact) => string): this {
+    public AddCondition(conditionName: string, testFunction: (fact: Fact, knowledgeBase?: IKnowledgeBase) => string): this {
         this.ruleCheck()
 
         const ruleset = this._rulesetMap.get(this.lastRuleset)
@@ -487,7 +677,7 @@ export class RuleForge {
         return this
     }
 
-    public AddConditionToRule(rulesetName: string, ruleName: string, conditionName: string, testFunction: (fact: Fact) => string): this {
+    public AddConditionToRule(rulesetName: string, ruleName: string, conditionName: string, testFunction: (fact: Fact, knowledgeBase?: IKnowledgeBase) => string): this {
         const ruleset = this._rulesetMap.get(rulesetName)
         if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
 
