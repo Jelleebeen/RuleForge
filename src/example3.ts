@@ -70,12 +70,25 @@ export module runExample {
             })
             .AddRule('midfielder')
             .AddKnowledgeAction(() => { console.log('found a midfielder')}, 'teamhasamidfielder', 'team', 'midfielder', true )
-            .AddCondition('findMidfielder', (fact) => {
+            .AddCondition('findMidfielder', (fact, kb) => {
+                if (kb === undefined) return OUTCOME.FAIL
+
+                let foundMidfielder: boolean = false
                 for (let [key, value] of Object.entries(fact.factData)) {
                     if (value.hasOwnProperty('midfielder')) {
-                        if (value['midfielder'] == true) return OUTCOME.PASS
+                        if (value['midfielder'] == true) {
+                            // Save the name of each eligible midfielder, to be counted in the next rule.
+                            const midfielderData: FactData = {}
+                            midfielderData['midfielder'] = {}
+                            midfielderData['midfielder']['name'] = key
+                            kb.addMemoryElement('midfielder', new Fact('midfielder', midfielderData)) 
+                            
+                            foundMidfielder = true
+                        }
                     }
                 }
+
+                if (foundMidfielder === true) return OUTCOME.PASS
 
                 return OUTCOME.FAIL
             })
@@ -85,25 +98,14 @@ export module runExample {
 
                 if (kb === undefined) return OUTCOME.FAIL
 
-                const teamFacts = kb.getMemoryElement('team')
+                const midfielderFacts = kb.getMemoryElement('midfielder')
 
-                if (teamFacts === undefined) return OUTCOME.FAIL // No team element facts at all
+                if (midfielderFacts === undefined) return OUTCOME.FAIL // No midfielders at all
 
-                // Checking knowledge base instead of just counting first, for demo purposes.
-                let oneMidfielder: boolean = false
-                for (let i = 0, n = teamFacts.length; i < n; ++i) {     
-                    if (teamFacts[i].hasValue('team', 'midfielder', COMPARE.EQUAL, 'true')) oneMidfielder = true
-                }
-                if (oneMidfielder == false) return OUTCOME.FAIL // No 1st midfielder, so cant be 2nd one.
+                // Checking knowledge base instead of just counting midfielders in the fact, for demo purposes.
+                let midfielderCount: number = midfielderFacts.length
                 
-                // Count the number of midfielders.
-                for (let [key, value] of Object.entries(fact.factData)) {
-                    let count: number = 0
-                    if (value.hasOwnProperty('midfielder')) {
-                        if (value['midfielder'] == true && count === 0) count++
-                        if (value['midfielder'] == true && count === 1) return OUTCOME.PASS
-                    }
-                }
+                if (midfielderCount > 1) return OUTCOME.PASS
 
                 return OUTCOME.FAIL
             })
