@@ -1,6 +1,6 @@
 {
     "name": "@ruleforge/ruleforge",
-    "version": "0.1.2",
+    "version": "0.1.4",
     "description": "A library for adding rules to your app.",
     "main": "ruleforge.umd.cjs",
     "module": "ruleforge.js",
