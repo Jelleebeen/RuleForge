@@ -1,4 +1,4 @@
-import { RuleForge, OUTCOME, Result, Fact, COMPARE, IKnowledgeBase, KnowledgeBase } from "./ruleset/ruleset"
+import { RuleForge, OUTCOME, Result, Fact, COMPARE, KnowledgeBase } from "./ruleset/ruleset"
 import type { FactData } from "./ruleset/ruleset"
 
 export module runExample {
@@ -47,7 +47,7 @@ export module runExample {
         .NewRuleset('firstRS')
         const results: Result[] = rf
             .AddRule('goalkeeper')
-            .AddKnowledgeAction(() => { console.log('found a goalkeeper') }, 'teamhasagoalkeeper', 'team', 'goalkeeper', true )
+            .AddKnowledgeAction(() => { console.log('found a goalkeeper') }, 'teamhasagoalkeeper', 'team', 'goalkeeper', true ) // Saves to the knowledge base
             .AddCondition('findGoalkeeper', (fact) => {
                 for (let [key, value] of Object.entries(fact.factData)) {
                     if (value.hasOwnProperty('goalkeeper')) {
@@ -77,7 +77,7 @@ export module runExample {
                 for (let [key, value] of Object.entries(fact.factData)) {
                     if (value.hasOwnProperty('midfielder')) {
                         if (value['midfielder'] == true) {
-                            // Save the name of each eligible midfielder, to be counted in the next rule.
+                            // Save the name of each eligible midfielder to the knowledge base, to be counted in the next rule.
                             const midfielderData: FactData = {}
                             midfielderData['midfielder'] = {}
                             midfielderData['midfielder']['name'] = key
@@ -98,11 +98,9 @@ export module runExample {
 
                 if (kb === undefined) return OUTCOME.FAIL
 
-                const midfielderFacts = kb.getMemoryElement('midfielder')
-
-                if (midfielderFacts === undefined) return OUTCOME.FAIL // No midfielders at all
-
                 // Checking knowledge base instead of just counting midfielders in the fact, for demo purposes.
+                const midfielderFacts = kb.getMemoryElement('midfielder')
+                if (midfielderFacts === undefined) return OUTCOME.FAIL // No midfielders at all        
                 let midfielderCount: number = midfielderFacts.length
                 
                 if (midfielderCount > 1) return OUTCOME.PASS
@@ -123,6 +121,7 @@ export module runExample {
             .AddRule('fullteam')
             .AddKnowledgeAction(() => { console.log('we have a full team!')}, 'team is full', 'team', 'fullteam', true )
             .AddCondition('findFullTeam', (fact, kb) => {
+                // Check the knowledge base, to see if all the roles within the team are filled.
                 let goalkeeper: boolean = false 
                 let defender: boolean = false
                 let midfielder: boolean = false 
@@ -148,6 +147,8 @@ export module runExample {
             })
             .RunRules(fact1)
             .GetResults()
+
+        console.log(results)
     }
     testFunction()
 }

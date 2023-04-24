@@ -56,6 +56,8 @@ export module runExample {
             })
             .RunRules(fact1)
             .GetResults()
+        
+        console.log(results)
     }
     testFunction()
 }

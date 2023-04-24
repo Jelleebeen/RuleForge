@@ -183,7 +183,6 @@ export interface IRelationship {
     relationshipDescription: string,
     subject: string
     relation: string,
-    relative: string
 }
 
 export class Relationship implements IRelationship {
@@ -191,32 +190,29 @@ export class Relationship implements IRelationship {
     private _relationshipDescription: string
     private _relation: string
     private _subject: string
-    private _relative: string
 
     public get relationshipName() { return this._relationshipName }
     public get relationshipDescription() { return this._relationshipDescription }
     public get relation() { return this._relation }
     public get subject() { return this._subject }
-    public get relative() { return this._relative }
 
-    constructor(name: string , description: string, relation: string, subject: string, relative: string) {
+    constructor(name: string , description: string, relation: string, subject: string) {
         this._relationshipName = name
         this._relationshipDescription = description
-        this._relation = relation
-        this._subject = subject // Key for memory element hash map.
-        this._relative = relative 
+        this._relation = relation // Key for memory element hash map.
+        this._subject = subject 
     }
 }
 
 export interface IKnowledgeBase {
-    relationships: Map<string, IRelationship[]> // relationship.relative, relationship
+    relationships: Map<string, IRelationship[]> // relationship.relation, relationship
     memoryElements: Map<string, IFact[]> // fact.key (such as fact['subject1'] would be 'subject1'), fact.
 
-    hasRelationship: (relative: string) => boolean
-    getRelationships: (relative: string) => IRelationship[]
+    hasRelationship: (relation: string) => boolean
+    getRelationships: (relation: string) => IRelationship[]
     addRelationship: (relationship: IRelationship) => void
     removeRelationship: (relationship: IRelationship) => void
-    removeRelation: (relative: string) => void
+    removeRelation: (relation: string) => void
 
     hasMemoryElement: (subject: string) => boolean
     getMemoryElement: (subject: string) => IFact[]
@@ -255,15 +251,15 @@ export class KnowledgeBase implements IKnowledgeBase {
     }
 
     public addRelationship (relationship: IRelationship): void {
-        const relationships = this._relationshipMap.get(relationship.relative)
+        const relationships = this._relationshipMap.get(relationship.relation)
 
         if (relationships === undefined) {
-            this._relationshipMap.set(relationship.relative, [relationship])
+            this._relationshipMap.set(relationship.relation, [relationship])
         }
     }
 
     public removeRelationship (relationship: IRelationship): void {
-        this._relationshipMap.delete(relationship.relative)
+        this._relationshipMap.delete(relationship.relation)
     }
 
     public removeRelation (relative: string) : void {
@@ -298,7 +294,7 @@ export class KnowledgeBase implements IKnowledgeBase {
         if (elements === undefined) {
             this._memoryElementMap.set(subject, [fact])
         } else {
-            elements.push(fact) // TODO - test that this is applied by reference to the map.
+            elements.push(fact)
         }    
     }
 
@@ -468,22 +464,26 @@ export class Ruleset implements IRuleset {
         // Loop through, test the conditions and fire the actions on each rule in the ruleMap
         this._passedRules = []
         this._results = []
-        let result: Result = { rulesetName: this.name, ruleName: '', factName: fact.name, outcome: '' }
 
         rulemaploop:
         for(let [key, value] of this._ruleMap) {
-            
-            result.outcome = value.testConditions(fact) // Result of running the conditions on this rule.
-            result.ruleName = key // The name of this rule.
-            this._results.push(result)
-            const seenRules: string[] = [key] // A list of rules we have seen in this iteration
 
-            while(result.outcome !== OUTCOME.PASS) {
+            const firstResult: Result = { rulesetName: this.name, ruleName: '', factName: fact.name, outcome: '' }
+            
+            firstResult.outcome = value.testConditions(fact) // Result of running the conditions on this rule.
+            firstResult.ruleName = key // The name of this rule.
+            this._results.push(firstResult)
+            const seenRules: string[] = [key] // A list of rules we have seen in this iteration
+            let lastOutcome = firstResult.outcome
+
+            while(lastOutcome !== OUTCOME.PASS) {
+                const result: Result = { rulesetName: this.name, ruleName: firstResult.ruleName, factName: fact.name, outcome: firstResult.outcome }
+
                 // If this rule failed, return failed .
-                if (result.outcome === OUTCOME.FAIL) return result
+                if (lastOutcome === OUTCOME.FAIL) return result
 
                 // If an error is detected, throw that there was an error. TODO -- Store that error in the result.
-                if (result.outcome === OUTCOME.ERROR) throw new Error(`An error occurred when running rule '${result.ruleName}'`)
+                if (lastOutcome === OUTCOME.ERROR) throw new Error(`An error occurred when running rule '${result.ruleName}'`)
 
                 if (seenRules.includes(result.outcome)) {
                     // We've been here before, so will eventually return here in an infinite loops from the same conditions.
@@ -508,7 +508,7 @@ export class Ruleset implements IRuleset {
             continue rulemaploop
         }
 
-        return result
+        return this._results[this._results.length - 1] // All rules passed, so return last saved result.
     }
 
     public fireAllPasses(obj?: any): void {

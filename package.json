@@ -1,16 +1,16 @@
 {
-  "name": "@ruleforge/ruleforge",
-  "version": "0.0.13",
-  "repository": "https://github.com/Jelleebeen/RuleForge",
-  "description": "A library for adding rules to your web app.",
+  "name": "ruleforge",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
   "scripts": {
-    "compile": "rd /s /q dist && tsc && tsc --build tsconfig.es5.json && xcopy README.md dist && xcopy package.json.backup dist",
-    "docs": "typedoc --out docs src/index.ts"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
-  "author": "Dave Hurst",
-  "license": "MIT",
   "devDependencies": {
-    "typedoc": "^0.23.28",
-    "typescript": "^5.0.2"
+    "pathe": "^1.1.0",
+    "typescript": "^4.9.3",
+    "vite": "^4.2.0"
   }
 }

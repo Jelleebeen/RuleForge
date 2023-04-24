@@ -1,1 +1,2 @@
-export { RuleForge, Ruleset, Rule, Action, Condition, StandardCondition, Fact, FactData, Result, KnowledgeBase, OUTCOME, COMPARE, IRuleset, IRule, IAction, ICondition, IFact, IKnowledgeBase, IRelationship } from './ruleset/ruleset'
+export { RuleForge, Ruleset, Rule, Action, Condition, StandardCondition, Fact, KnowledgeBase, OUTCOME, COMPARE } from './ruleset/ruleset'
+export type {FactData, Result, IRuleset, IRule, IAction, ICondition, IFact, IKnowledgeBase, IRelationship} from './ruleset/ruleset'
