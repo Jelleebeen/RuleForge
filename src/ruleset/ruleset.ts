@@ -474,6 +474,8 @@ export class Ruleset implements IRuleset {
             firstResult.ruleName = key // The name of this rule.
             this._results.push(firstResult)
             const seenRules: string[] = [key] // A list of rules we have seen in this iteration
+
+            
             let lastOutcome = firstResult.outcome
 
             while(lastOutcome !== OUTCOME.PASS) {
@@ -499,6 +501,7 @@ export class Ruleset implements IRuleset {
 
                 seenRules.push(result.ruleName)
                 result.outcome = this.getRule(result.ruleName).testConditions(fact)
+                lastOutcome = result.outcome
                 this._results.push(result)
             }
 

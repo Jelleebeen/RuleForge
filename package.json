@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && xcopy README.md dist && xcopy package.json.backup dist",
     "preview": "vite preview",
     "docs": "typedoc --out docs src/index.ts"
   },
