@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'pathe'
+import dts from 'vite-plugin-dts'
 
 export default defineConfig({
     build: {
@@ -10,5 +11,11 @@ export default defineConfig({
           // the proper extensions will be added
           fileName: 'ruleforge',
         },
+        rollupOptions: {
+          output: {
+            inlineDynamicImports: false
+          }
+        }
       },
+      plugins: [dts()]
 })

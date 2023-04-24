@@ -1,16 +1,19 @@
 {
     "name": "@ruleforge/ruleforge",
-    "version": "0.1.0",
+    "version": "0.1.2",
     "description": "A library for adding rules to your app.",
-    "main": "dist/ruleforge.js",
-    "module": "dist/ruleforge.js",
+    "main": "ruleforge.umd.cjs",
+    "module": "ruleforge.js",
     "sideEffects": false,
     "repository": {
         "type": "git",
         "url": "https://github.com/Jelleebeen/RuleForge.git"
     },
     "files": [
-        "lib",
+        "./ruleset/ruleset.d.ts",
+        "ruleforge.js",
+        "ruleforge.umd.cjs",
+        "index.d.ts",
         "CHANGELOG.md",
         "LICENSE",
         "package.json",
@@ -23,7 +26,11 @@
         "rulesengine",
         "utils",
         "utilities",
-        "ruleforge"
+        "ruleforge",
+        "inference",
+        "forward-chaining",
+        "backward-chaining",
+        "first-order logic"
     ],
     "author": "Dave Hurst",
     "license": "MIT",
