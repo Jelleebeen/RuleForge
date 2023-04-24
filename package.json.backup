@@ -2,8 +2,8 @@
     "name": "@ruleforge/ruleforge",
     "version": "0.1.0",
     "description": "A library for adding rules to your app.",
-    "main": "lib/es5/index.js",
-    "module": "lib/es6/index.js",
+    "main": "dist/ruleforge.js",
+    "module": "dist/ruleforge.js",
     "sideEffects": false,
     "repository": {
         "type": "git",
