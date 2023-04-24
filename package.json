@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "docs": "typedoc --out docs src/index.ts"
   },
   "devDependencies": {
     "pathe": "^1.1.0",
