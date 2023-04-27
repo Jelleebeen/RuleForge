@@ -79,6 +79,73 @@ export interface IFact {
     hasValue: (subjectName: string, attributeName: string, compare: COMPARE, value: string) => boolean
 }
 
+function CompareValue(attribute: any, compare: COMPARE, value: any): boolean {
+    switch (compare) {
+        case COMPARE.EQUAL:
+            if (typeof attribute === 'number')
+            return attribute == parseInt(value)
+
+            return attribute.toString() == value
+        break
+        
+        case COMPARE.NOTEQUAL:
+            if (typeof attribute === 'number')
+            return attribute == parseInt(value)
+
+            return attribute.toString() != value
+        break
+
+        case COMPARE.CONTAINS:
+            if (typeof attribute !== 'object') return false
+
+            attribute.forEach((item: any) => {
+                if (typeof item === 'number' && item === parseInt(value)) return true
+
+                if (item.toString() == value) return true 
+            })
+
+            return false
+        break
+
+        case COMPARE.NOTCONTAINS:
+            if (typeof attribute !== 'object') return true
+
+            attribute.forEach((item: any) => {
+                if (typeof item === 'number' && item === parseInt(value)) return false
+
+                if (item.toString() == value) return false 
+            })
+
+            return true
+        break
+
+        case COMPARE.GREATERTHAN:
+            if (typeof attribute !== 'number') return false
+            
+            return attribute > parseInt(value)
+        break
+
+        case COMPARE.LESSTHAN:
+            if (typeof attribute !== 'number') return false
+            
+            return attribute < parseInt(value)
+        break
+
+        case COMPARE.GREATEROREQUAL:
+            if (typeof attribute !== 'number') return false
+            
+            return attribute >= parseInt(value)
+
+        case COMPARE.LESSOREQUAL:
+            if (typeof attribute !== 'number') return false
+            
+            return attribute <= parseInt(value)
+
+        default:
+            return false
+    }
+}
+
 export class Fact implements IFact {
     [key: string]: any
     private _factName: string
@@ -111,70 +178,7 @@ export class Fact implements IFact {
 
         const attribute = this._factData[subjectName][attributeName]
 
-        switch (compare) {
-            case COMPARE.EQUAL:
-                if (typeof attribute === 'number')
-                return attribute == parseInt(value)
-
-                return attribute.toString() == value
-            break
-            
-            case COMPARE.NOTEQUAL:
-                if (typeof attribute === 'number')
-                return attribute == parseInt(value)
-
-                return attribute.toString() != value
-            break
-
-            case COMPARE.CONTAINS:
-                if (typeof attribute !== 'object') return false
-
-                attribute.forEach((item: any) => {
-                    if (typeof item === 'number' && item === parseInt(value)) return true
-
-                    if (item.toString() == value) return true 
-                })
-
-                return false
-            break
-
-            case COMPARE.NOTCONTAINS:
-                if (typeof attribute !== 'object') return true
-
-                attribute.forEach((item: any) => {
-                    if (typeof item === 'number' && item === parseInt(value)) return false
-
-                    if (item.toString() == value) return false 
-                })
-
-                return true
-            break
-
-            case COMPARE.GREATERTHAN:
-                if (typeof attribute !== 'number') return false
-                
-                return attribute > parseInt(value)
-            break
-
-            case COMPARE.LESSTHAN:
-                if (typeof attribute !== 'number') return false
-                
-                return attribute < parseInt(value)
-            break
-
-            case COMPARE.GREATEROREQUAL:
-                if (typeof attribute !== 'number') return false
-                
-                return attribute >= parseInt(value)
-
-            case COMPARE.LESSOREQUAL:
-                if (typeof attribute !== 'number') return false
-                
-                return attribute <= parseInt(value)
-
-            default:
-                return false
-        }
+        return CompareValue(attribute, compare, value)
     }
 }
 
@@ -183,6 +187,9 @@ export interface IRelationship {
     relationshipDescription: string,
     subject: string
     relation: string,
+
+    setSubject: (subject: string) => void
+    setRelation: (relation: string) => void
 }
 
 export class Relationship implements IRelationship {
@@ -196,7 +203,15 @@ export class Relationship implements IRelationship {
     public get relation() { return this._relation }
     public get subject() { return this._subject }
 
-    constructor(name: string , description: string, relation: string, subject: string) {
+    public setSubject(subject: string): void {
+        this._subject = subject
+    }
+
+    public setRelation(relation: string): void {
+        this._relation = relation
+    }
+
+    constructor(name: string , description: string, relation: string='', subject: string='') {
         this._relationshipName = name
         this._relationshipDescription = description
         this._relation = relation // Key for memory element hash map.
@@ -205,8 +220,9 @@ export class Relationship implements IRelationship {
 }
 
 export interface IKnowledgeBase {
-    relationships: Map<string, IRelationship[]> // relationship.relation, relationship
+    relationships: Map<string, IRelationship[]> // subject, relationship
     memoryElements: Map<string, IFact[]> // fact.key (such as fact['subject1'] would be 'subject1'), fact.
+    related: string[]
 
     hasRelationship: (relation: string) => boolean
     getRelationships: (relation: string) => IRelationship[]
@@ -219,18 +235,26 @@ export interface IKnowledgeBase {
     getMemoryElementsByFact: (fact: IFact) => IFact[]
     addMemoryElement: (subject: string, fact: IFact) => void
     removeMemoryElement: (subject: string) => void
+
+    clearRelated: () => void
+    addToRelated: (entry: string) => void
 }
 
 export class KnowledgeBase implements IKnowledgeBase {
     private _relationshipMap: Map<string, IRelationship[]> // A subjects relationships with other subjects.
     private _memoryElementMap: Map<string, IFact[]> // Facts about a subject
+    private _relatedList: string[] = []
 
-    public get relationships() {
+    public get relationships(): Map<string, IRelationship[]> {
         return this._relationshipMap
     }
 
-    public get memoryElements() {
+    public get memoryElements(): Map<string, IFact[]> {
         return this._memoryElementMap
+    }
+
+    public get related(): string[] {
+        return this._relatedList
     }
 
     constructor() {
@@ -301,6 +325,14 @@ export class KnowledgeBase implements IKnowledgeBase {
     public removeMemoryElement (subject: string): void {
         this._memoryElementMap.delete(subject)
     }
+
+    public clearRelated () {
+        this._relatedList = []
+    }
+
+    public addToRelated(entry: string) {
+        this._relatedList.push(entry)
+    }
 }
 
 export class Action implements IAction {
@@ -326,6 +358,43 @@ export class KnowledgeAction implements IAction {
         this.actFunction = actFunction
         this.fact = fact // Subject this refers to is defined up front for this type of action.
     }
+}
+
+export class RelationshipAction implements IAction {
+    private knowledgeBase: KnowledgeBase
+    private actFunction = (obj?: any) => {}
+    private relationship: IRelationship // Relationship to be applied when this action is fired, defined up front for this type of action.
+
+    public act (obj: Fact) {
+        // When this is fired, an object is passed in with the subject that will have this relationship.
+        // The knowledgebase will store a list of relations that are populated in the condition.
+        // Ex: If relationship is 'x owes money to y', subject (x) Jack owes money to relation (y) Jill.
+        if (obj === undefined) throw new Error(`No object with relationship data passed to action`)
+        if (typeof obj !== 'object') throw new Error(`No object with relationship data passed to action`)
+
+        const factData: FactData = obj.factData
+        
+        if (!factData.hasOwnProperty('subject')) throw new Error(`Object passed to relationship action is missing a subject`)
+        
+        for (let i=0, n=this.knowledgeBase.related.length; i < n; i++) {
+            const rel: Relationship = new Relationship(
+                                        this.relationship.relationshipName, 
+                                        this.relationship.relationshipDescription,
+                                        factData['subject'],
+                                        this.knowledgeBase.related[i]
+                                    )
+            this.knowledgeBase.addRelationship(rel)
+        }
+
+        this.actFunction(factData)      
+    }
+
+    constructor(knowledgeBase: KnowledgeBase, actFunction: (obj?: any) => void, relationship: IRelationship) {
+        this.knowledgeBase = knowledgeBase
+        this.actFunction = actFunction
+        this.relationship = relationship
+    }
+
 }
 
 export class Condition implements ICondition {
@@ -507,7 +576,7 @@ export class Ruleset implements IRuleset {
 
             // This rule passed all conditions
             this._passedRules.push(key)
-            if (fireOnPass) value.fireAction() // If fireOnPass is enabled, fire action on rule now
+            if (fireOnPass) value.fireAction(fact) // If fireOnPass is enabled, fire action on rule now
             continue rulemaploop
         }
 
@@ -627,8 +696,22 @@ export class RuleForge {
 
         const knowledgeFact = new Fact(name, knowledgeData)
 
-
         rule.action = new KnowledgeAction(this.knowledgeBase, actionFunction, knowledgeFact)
+
+        return this
+    }
+
+    public AddRelationshipAction(actionFunction: (obj?: any) => void, name: string, description: string, subject: string = '', relation: string = ''): this {
+        this.ruleCheck()
+        
+        const ruleset = this._rulesetMap.get(this.lastRuleset)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(this.lastRuleset))
+
+        const rule = ruleset.getRule(this.lastRule)
+
+        const relationship = new Relationship(name, description, relation, subject)
+
+        rule.action = new RelationshipAction(this.knowledgeBase, actionFunction, relationship)
 
         return this
     }
@@ -654,6 +737,18 @@ export class RuleForge {
         const knowledgeFact = new Fact(name, knowledgeData)
 
         ruleset.getRule(ruleName).action = new KnowledgeAction(this.knowledgeBase, actionFunction, knowledgeFact)
+
+        return this
+    }
+
+    public AddRelationshipActionToRule(rulesetName: string, ruleName: string, actionFunction: (obj?: any) => void, name: string, 
+                                        description: string, subject: string, relation: string): this {
+        const ruleset = this._rulesetMap.get(rulesetName)
+        if (ruleset === undefined) throw new Error(this.rulesetNameError(rulesetName))
+
+        const relationship = new Relationship(name, description, relation, subject)
+
+        ruleset.getRule(ruleName).action = new RelationshipAction(this.knowledgeBase, actionFunction, relationship)
 
         return this
     }
